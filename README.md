@@ -1,5 +1,7 @@
 # NAG Explainer
 
+**Live: https://barbieriht.github.io/nag-explainer/** · [Português](https://barbieriht.github.io/nag-explainer/index.pt.html)
+
 An interactive, in-browser explainer of Neural Architecture Generation (NAG):
 designing neural networks by sampling from a learned generative model instead
 of searching for one architecture per task. Every demo runs live in the
@@ -8,6 +10,8 @@ runtime. Built as part of ongoing PhD research in AI at the University of
 São Paulo (USP), and based on the paper *From Search to Synthesis: A
 Systematic Mapping Study of Neural Architecture Generation* (Barbieri,
 Alcobaça & de Carvalho; under review).
+
+![The page with its collapsible sections](assets/img/readme/overview.png)
 
 ## What is inside
 
@@ -25,6 +29,12 @@ Alcobaça & de Carvalho; under review).
   generation.
 - **Evaluating a generator, open problems, references.** Every citation
   resolves to a real entry of the author's bibliography.
+
+| | |
+|---|---|
+| ![The exact distribution p*(A) at a chosen temperature](assets/img/readme/temperature.png) | ![NAS against a trained generator on a new task](assets/img/readme/amortization.png) |
+
+![GFlowNet against reinforcement learning](assets/img/readme/gflownet.png)
 
 ## The toy world
 
