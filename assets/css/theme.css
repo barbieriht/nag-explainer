@@ -1,0 +1,76 @@
+/*
+ * Design tokens. Light is the default; dark follows the OS setting unless the
+ * reader picked a theme with the header toggle, which sets
+ * <html data-theme="light|dark"> (see assets/js/theme.js).
+ */
+:root {
+  color-scheme: light;
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --text: #1c1f24;
+  --text-muted: #545b66;
+  --border: #d9dce1;
+  --accent: #1f5fa8;
+  --accent-contrast: #ffffff;
+  --warn-bg: #fff4d6;
+  --warn-text: #5c4400;
+  --series-a: #1f5fa8;
+  --series-b: #b8440f;
+  --series-muted: #878e99;
+  --chart-grid: #e6e8eb;
+  --op-conv3x3: #2a78d6;
+  --op-avgpool: #eb6834;
+  --op-conv1x1: #1baf7a;
+  --op-skip: #878e99;
+
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --gutter: 16px;
+  --radius: 6px;
+}
+
+/* The dark palette appears twice: once for the OS preference (unless the
+   reader forced light) and once for an explicit dark choice. Keep in sync. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121418;
+    --surface: #1b1e24;
+    --text: #e6e8eb;
+    --text-muted: #a3a9b3;
+    --border: #343a44;
+    --accent: #7fb2ec;
+    --accent-contrast: #121418;
+    --warn-bg: #3a2f10;
+    --warn-text: #f3dc9b;
+    --series-a: #7fb2ec;
+    --series-b: #f0915a;
+    --series-muted: #6f7785;
+    --chart-grid: #2a2f37;
+    --op-conv3x3: #3987e5;
+    --op-avgpool: #d95926;
+    --op-conv1x1: #199e70;
+    --op-skip: #8b93a1;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121418;
+  --surface: #1b1e24;
+  --text: #e6e8eb;
+  --text-muted: #a3a9b3;
+  --border: #343a44;
+  --accent: #7fb2ec;
+  --accent-contrast: #121418;
+  --warn-bg: #3a2f10;
+  --warn-text: #f3dc9b;
+  --series-a: #7fb2ec;
+  --series-b: #f0915a;
+  --series-muted: #6f7785;
+  --chart-grid: #2a2f37;
+  --op-conv3x3: #3987e5;
+  --op-avgpool: #d95926;
+  --op-conv1x1: #199e70;
+  --op-skip: #8b93a1;
+}

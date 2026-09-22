@@ -1,0 +1,6 @@
+# Raw author exports (converted into assets/data/ by scripts/)
+data-src/
+
+node_modules/
+.DS_Store
+Thumbs.db

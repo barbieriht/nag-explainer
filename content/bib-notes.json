@@ -1,0 +1,4 @@
+{
+  "_about": "Entries of the .bib that must not be cited until fixed: the key points to a different paper than the one it is used for. scripts/import-literature.js marks them verified: false and scripts/build-page.js refuses to cite them. Remove a note once the .bib is fixed.",
+  "unverified": {}
+}

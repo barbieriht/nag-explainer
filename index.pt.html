@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NAG Explainer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cg fill=%27none%27 stroke=%27%231f5fa8%27 stroke-width=%273%27%3E%3Ccircle cx=%275%27 cy=%2716%27 r=%273%27/%3E%3Ccircle cx=%2727%27 cy=%2716%27 r=%273%27/%3E%3Cpath d=%27M8 16h16M7 13Q16 0 25 13%27/%3E%3C/g%3E%3C/svg%3E">
+  <meta name="description" content="Explicação interativa, no navegador, da Geração de Arquiteturas Neurais (NAG): projetar redes neurais amostrando de um modelo generativo aprendido em vez de buscar.">
+  <meta name="author" content="Thiago Barbieri">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="NAG Explainer">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:title" content="NAG Explainer: da busca de arquiteturas à geração de arquiteturas">
+  <meta property="og:description" content="Demonstrações ao vivo no navegador: por que buscar uma arquitetura por tarefa é caro, e como modelos generativos aprendem uma distribuição inteira de boas arquiteturas.">
+  <meta property="og:url" content="https://barbieriht.github.io/nag-explainer/index.pt.html">
+  <meta name="twitter:card" content="summary">
+  <link rel="alternate" hreflang="en" href="index.html">
+  <link rel="alternate" hreflang="pt-BR" href="index.pt.html">
+  <link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <script src="assets/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Pular para o conteúdo</a>
+  <header class="site-header">
+    <nav class="site-nav" aria-label="Site">
+      <a class="brand" href="#top">NAG Explainer</a>
+      <div class="lang-switch" role="group" aria-label="Idioma" data-lang-switch>
+        <a href="index.html" hreflang="en" lang="en">EN</a>
+        <a href="index.pt.html" hreflang="pt-BR" lang="pt-BR" aria-current="true">PT</a>
+      </div>
+      <button type="button" class="theme-toggle" data-theme-toggle data-label-dark="Mudar para o tema escuro" data-label-light="Mudar para o tema claro"></button>
+    </nav>
+  </header>
+  <main id="content">
+    <div id="top"></div>
+    <h1>Da busca de arquiteturas à geração de arquiteturas</h1>
+    <p class="lede">A Busca de Arquiteturas Neurais (NAS) trata o projeto de redes como um problema de otimização: testar candidatas, treiná-las, ficar com a melhor e recomeçar na próxima tarefa. A Geração de Arquiteturas Neurais (NAG) treina, em vez disso, um modelo generativo que aprendeu como são as boas arquiteturas e amostra novas sob demanda. As seções abaixo explicam a diferença com pequenos experimentos que rodam no seu navegador. Abra qualquer seção para lê-la.</p>
+    <div class="section-tools">
+      <button type="button" data-sections="expand">Expandir tudo</button>
+      <button type="button" data-sections="collapse">Recolher tudo</button>
+    </div>
+
+    <details class="section" id="motivation">
+      <summary><h2 class="section-title">Por que automatizar o projeto de arquiteturas?</h2><span class="section-sub">A estrutura importa, e acertá-la custa caro</span></summary>
+      <div class="section-body">
+        <p class="lede">Muitos dos resultados marcantes do deep learning vieram de uma arquitetura nova, e não de mais dados ou de um otimizador novo.</p>
+        <p>Redes convolucionais profundas venceram o ImageNet <a class="cite" href="#Krizhevsky2017imagenet" data-cite="Krizhevsky2017imagenet">(Krizhevsky et al., 2017)</a>, conexões residuais tornaram treináveis redes muito profundas <a class="cite" href="#he2016" data-cite="he2016">(He et al., 2016)</a> e a atenção substituiu a recorrência em modelos de sequência <a class="cite" href="#attentionisallyouneed2017" data-cite="attentionisallyouneed2017">(Vaswani et al., 2017)</a>. Cada uma delas foi projetada à mão, escolhendo tipos de camada, sua ordem, como se conectam e muitos hiperparâmetros.</p>
+        <p>O espaço de projeto definido por essas escolhas é enorme e muito estruturado, e explorá-lo por tentativa e erro é lento <a class="cite" href="#pmlr-v28-bergstra13" data-cite="pmlr-v28-bergstra13">(Bergstra et al., 2013)</a>. À medida que os modelos cresceram, o projeto manual virou um gargalo para escala, reprodutibilidade e reaproveitamento entre tarefas. O passo natural foi deixar um algoritmo explorar.</p>
+        <p>Esse algoritmo tomou duas formas. A primeira, a <a href="#nas">busca</a>, procura a melhor arquitetura para uma tarefa. A segunda, a <a href="#search-to-generation">geração</a>, aprende um modelo de boas arquiteturas que pode ser reutilizado.</p>
+      </div>
+    </details>
+
+    <details class="section" id="nas">
+      <summary><h2 class="section-title">Busca: a visão do NAS</h2><span class="section-sub">Projeto de arquiteturas como otimização</span></summary>
+      <div class="section-body">
+        <p class="lede">A Busca de Arquiteturas Neurais formula o projeto como um problema de otimização discreta sobre um espaço de candidatas definido de antemão por pessoas <a class="cite" href="#elskensurvey2019" data-cite="elskensurvey2019">(Elsken et al., 2019)</a>.</p>
+
+        <h3>Três ingredientes</h3>
+        <ul>
+          <li>Um <strong>espaço de busca</strong>: quais arquiteturas são permitidas. Para mantê-lo tratável, muitos métodos buscam só um pequeno motivo repetido, uma <em>célula</em>, e empilham cópias dela para formar a rede completa <a class="cite" href="#zoph2018learningtransferablearchitecturesscalable" data-cite="zoph2018learningtransferablearchitecturesscalable">(Zoph et al., 2018)</a>.</li>
+          <li>Uma <strong>estratégia de busca</strong>: como escolher a próxima candidata. Aprendizado por reforço <a class="cite" href="#zoph2017neuralarchitecturesearchreinforcement" data-cite="zoph2017neuralarchitecturesearchreinforcement">(Zoph &amp; Le, 2017)</a>, evolução <a class="cite" href="#real2019" data-cite="real2019">(Real et al., 2019)</a>, otimização bayesiana <a class="cite" href="#white2020bananasbayesianoptimizationneural" data-cite="white2020bananasbayesianoptimizationneural">(White et al., 2020)</a> e relaxações baseadas em gradiente <a class="cite" href="#liu2019dartsdifferentiablearchitecturesearch" data-cite="liu2019dartsdifferentiablearchitecturesearch">(Liu et al., 2019)</a> já foram usados.</li>
+          <li>Uma <strong>estimativa de desempenho</strong>: quão boa é uma candidata, normalmente sua acurácia de validação após o treino, ou um substituto mais barato dela.</li>
+        </ul>
+        <p>Escrito por extenso, o NAS resolve um problema em dois níveis. O nível externo procura a arquitetura \(A\) do espaço de busca \(\mathcal{S}\) com a maior recompensa \(R\). O nível interno treina os pesos \(w\) de cada candidata:</p>
+        \[ A^* = \arg\max_{A \in \mathcal{S}} R\big(A, w^*(A)\big), \qquad w^*(A) = \arg\min_{w} \mathcal{L}_{\text{train}}(w, A). \]
+        <p>Cada avaliação de \(R\) esconde um treino completo, e por isso os primeiros NAS custavam milhares de GPU-dias <a class="cite" href="#real2017largescaleev" data-cite="real2017largescaleev">(Real et al., 2017)</a>. Compartilhamento de pesos <a class="cite" href="#pmlr-v80-pham18a" data-cite="pmlr-v80-pham18a">(Pham et al., 2018)</a>, treino de baixa fidelidade <a class="cite" href="#li2018hyperbandnovelbanditbasedapproach" data-cite="li2018hyperbandnovelbanditbasedapproach">(Li et al., 2018)</a> e extrapolação de curvas de aprendizado <a class="cite" href="#domhan2015sahodnn" data-cite="domhan2015sahodnn">(Domhan et al., 2015)</a> baratearam cada avaliação, mas a avaliação continua com o mesmo papel: uma nota externa que decide quais candidatas sobrevivem.</p>
+
+        <section class="demo" id="space-demo" aria-labelledby="space-demo-title">
+          <h4 id="space-demo-title">Experimente: o espaço de busca de brinquedo usado nesta página</h4>
+          <p>Todas as demonstrações desta página usam a mesma célula pequena, no estilo do NAS-Bench-201 <a class="cite" href="#dong2020nasbench201extendingscopereproducible" data-cite="dong2020nasbench201extendingscopereproducible">(Dong &amp; Yang, 2020)</a>. Ela tem quatro nós, e cada uma de suas seis arestas leva uma de cinco operações: nenhuma, conexão direta (skip), convolução 1×1, convolução 3×3 ou pooling médio. São 5<sup>6</sup> = 15.625 células, poucas o bastante para o navegador pontuar todas. É assim que as demonstrações conseguem mostrar respostas exatas.</p>
+          <div class="demo-panels even">
+            <figure>
+              <div data-role="cell"></div>
+              <figcaption>A célula, da esquerda para a direita, da entrada à saída. Cada aresta traz o nome da operação. Uma linha tracejada significa "nenhuma", e uma célula sem caminho completo da entrada à saída é degenerada.</figcaption>
+            </figure>
+            <div class="chart-block">
+              <div data-role="histogram"></div>
+              <p class="chart-caption">Acurácia das 15.625 células na tarefa escolhida. O marcador indica a célula ao lado.</p>
+            </div>
+          </div>
+          <div class="controls">
+            <label class="control"><span class="label">Tarefa</span>
+              <select data-role="task">
+                <option value="easy">Tarefa fácil</option>
+                <option value="medium" selected>Tarefa média</option>
+                <option value="hard">Tarefa difícil</option>
+              </select>
+            </label>
+            <div class="button-row">
+              <button type="button" class="primary" data-role="random">Célula aleatória</button>
+              <button type="button" data-role="best">Melhor célula</button>
+            </div>
+          </div>
+          <p class="demo-readout" data-role="readout" aria-live="polite"></p>
+          <p class="note">As acurácias vêm de uma função sintética definida à mão, <strong>não de dados do NAS-Bench-201</strong>. Ela favorece convoluções, profundidade acompanhada de uma conexão direta em paralelo e mais capacidade em tarefas difíceis, e soma um pequeno "ruído" determinístico. A página a usa para ilustrar ideias, não para ranquear métodos.</p>
+        </section>
+
+        <h3>Os limites da busca</h3>
+        <p>À medida que a área amadureceu, os custos dessa formulação ficaram mais claros <a class="cite" href="#white2023neuralarchitecturesearchinsights" data-cite="white2023neuralarchitecturesearchinsights">(White et al., 2023)</a>:</p>
+        <ul>
+          <li><strong>O espaço de busca decide o que pode ser encontrado.</strong> Um espaço desenhado por pessoas enviesa a descoberta para variações de projetos conhecidos. Dentro de espaços bem desenhados, a busca aleatória é uma referência surpreendentemente forte <a class="cite" href="#litalwalkar2020randomsearch" data-cite="litalwalkar2020randomsearch">(Li &amp; Talwalkar, 2020)</a> <a class="cite" href="#yu2019evaluatingsearchphaseneural" data-cite="yu2019evaluatingsearchphaseneural">(Yu et al., 2019)</a>, sinal de que boa parte do resultado vem do espaço, e não da estratégia.</li>
+          <li><strong>Cada tarefa nova começa do zero.</strong> Uma busca produz uma arquitetura para um conjunto de dados e um orçamento. O conhecimento acumulado no caminho é descartado.</li>
+          <li><strong>A avaliação fica do lado de fora.</strong> A nota filtra candidatas, mas nunca vira parte de um modelo reutilizável do que torna uma arquitetura boa.</li>
+        </ul>
+        <p>Esses limites levaram alguns autores a perguntar se o NAS é automação completa ou otimização dentro de fronteiras impostas por pessoas <a class="cite" href="#BAYMURZINA202282" data-cite="BAYMURZINA202282">(Baymurzina et al., 2022)</a>.</p>
+      </div>
+    </details>
+
+    <details class="section" id="search-to-generation">
+      <summary><h2 class="section-title">Da busca à geração</h2><span class="section-sub">Aprender uma distribuição em vez de achar um ponto</span></summary>
+      <div class="section-body">
+        <p class="lede">A Geração de Arquiteturas Neurais trata arquiteturas como amostras de uma distribuição de probabilidade aprendida \(p_\theta(A)\), e treina um modelo generativo para concentrar a maior parte da probabilidade em bons projetos.</p>
+        <p>Em vez de um \(\arg\max\), o alvo passa a ser uma distribuição que favorece recompensa alta. Uma escolha conveniente pesa cada arquitetura exponencialmente pela sua recompensa <a class="cite" href="#soin_generative_2025" data-cite="soin_generative_2025">(Soin et al., 2025)</a>:</p>
+        \[ p^*(A) \propto \exp\big(\beta\, R(A)\big). \]
+        <p>O parâmetro de temperatura \(\beta \ge 0\) controla o quanto a distribuição é seletiva. Com \(\beta = 0\), todas as arquiteturas são igualmente prováveis. Quando \(\beta \to \infty\), toda a massa colapsa na melhor arquitetura, e amostrar de \(p^*\) devolve exatamente a resposta do NAS, \(A^*\). Nesse sentido, o NAS é o limite de temperatura zero da NAG.</p>
+        <p>Um gerador é então treinado para aproximar esse alvo, \(\min_\theta D\big(p_\theta \,\|\, p^*\big)\) para alguma divergência \(D\). Depois de treinado, ele pode ser <em>condicionado</em> a uma descrição do conjunto de dados \(D\) ou a restrições \(C\), como um orçamento de latência, e amostrar arquiteturas de \(p_\theta(A \mid D, C)\) <a class="cite" href="#lee2021rapidneuralarchitecturesearch" data-cite="lee2021rapidneuralarchitecturesearch">(Lee et al., 2021)</a> <a class="cite" href="#lomurno_pomonag_2024" data-cite="lomurno_pomonag_2024">(Lomurno et al., 2024)</a>.</p>
+
+        <section class="demo" id="beta-demo" aria-labelledby="beta-demo-title">
+          <h4 id="beta-demo-title">Experimente: deslize a temperatura de "vale tudo" até "só a melhor"</h4>
+          <p>Esta demonstração calcula o \(p^*(A)\) exato sobre as 15.625 células enquanto você move o controle.</p>
+          <div class="demo-panels">
+            <div class="chart-block">
+              <div data-role="chart"></div>
+              <p class="chart-caption">Massa de probabilidade de \(p^*\) em cada faixa de acurácia (faixas de 0,5 ponto). O marcador tracejado é a melhor célula, \(A^*\).</p>
+            </div>
+            <figure>
+              <div data-role="cell"></div>
+              <figcaption data-role="cell-caption"></figcaption>
+            </figure>
+          </div>
+          <div class="controls">
+            <label class="control grow"><span class="label">Temperatura β = <span data-role="beta-value"></span></span>
+              <input type="range" data-role="beta" min="0" max="100" value="30" step="1">
+            </label>
+            <label class="control"><span class="label">Tarefa</span>
+              <select data-role="task">
+                <option value="easy">Tarefa fácil</option>
+                <option value="medium" selected>Tarefa média</option>
+                <option value="hard">Tarefa difícil</option>
+              </select>
+            </label>
+            <div class="button-row">
+              <button type="button" data-role="sample">Sortear uma amostra</button>
+            </div>
+          </div>
+          <table class="metrics">
+            <caption>Resumo de \(p^*\) nesta temperatura</caption>
+            <tbody>
+              <tr><th scope="row">Acurácia esperada</th><td data-fill="expected"></td></tr>
+              <tr><th scope="row">Probabilidade de sortear a melhor célula</th><td data-fill="p-best"></td></tr>
+              <tr><th scope="row">Número efetivo de arquiteturas (exponencial da entropia)</th><td data-fill="effective"></td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <h3>O que observar</h3>
+        <ul>
+          <li>Com β = 0, o histograma mostra apenas como as acurácias se espalham pelo espaço: a maioria das células é mediana.</li>
+          <li>À medida que β cresce, a massa vai para a direita e o número efetivo de arquiteturas cai de milhares para um punhado. Ainda assim é uma distribuição, então várias células boas diferentes mantêm uma parcela.</li>
+          <li>No extremo direito, a distribuição é praticamente toda concentrada em \(A^*\). Isso é o NAS.</li>
+        </ul>
+        <p>Manter uma distribuição em vez de um ponto não é só mais geral. Torna diversidade, incerteza e compromissos visíveis e controláveis, e é o que permite reutilizar o modelo aprendido, como mostra a <a href="#amortization">próxima seção</a>.</p>
+      </div>
+    </details>
+
+    <details class="section" id="amortization">
+      <summary><h2 class="section-title">Amortização: pagar uma vez, amostrar muitas</h2><span class="section-sub">Ciclo do NAS versus um gerador treinado</span></summary>
+      <div class="section-body">
+        <p class="lede">Uma busca paga o custo inteiro a cada tarefa nova. Um gerador paga um custo alto uma única vez, no treino, e depois produz arquiteturas para tarefas novas só com inferência.</p>
+        <p>Isso é <em>inferência amortizada</em>. A exploração cara de pares arquitetura–desempenho é feita uma vez, em muitas tarefas de treino, e fica guardada nos pesos de um modelo compartilhado \(p_\theta(A \mid D)\). Dado o descritor de um conjunto de dados novo, o modelo propõe arquiteturas em uma passada direta <a class="cite" href="#lee2021rapidneuralarchitecturesearch" data-cite="lee2021rapidneuralarchitecturesearch">(Lee et al., 2021)</a> <a class="cite" href="#navigator-d3_hemmi2024" data-cite="navigator-d3_hemmi2024">(Hemmi et al., 2024)</a>. A mesma ideia está por trás das abordagens de implantação do tipo "treine uma vez, especialize muitas" <a class="cite" href="#cai2019once" data-cite="cai2019once">(Cai et al., 2020)</a>.</p>
+
+        <section class="demo wide" id="amortization-demo" aria-labelledby="am-demo-title">
+          <h4 id="am-demo-title">Experimente: uma tarefa nova, buscada versus gerada</h4>
+          <p>As tarefas de brinquedo são descritas por dois números, <em>dificuldade</em> e <em>resolução da entrada</em>, e a melhor arquitetura muda com eles. Quando esta seção abre, um pequeno gerador condicional é treinado em 16 tarefas de treino, com as avaliações de uma busca evolutiva de 300 passos por tarefa, pesadas como em \(p^* \propto \exp(\beta R)\). Depois, escolha qualquer tarefa nova e compare.</p>
+          <div class="controls">
+            <label class="control"><span class="label">Tarefa nova: dificuldade = <span data-role="d1-value"></span></span>
+              <input type="range" data-role="d1" min="0" max="100" value="30" step="1">
+            </label>
+            <label class="control"><span class="label">Tarefa nova: resolução = <span data-role="d2-value"></span></span>
+              <input type="range" data-role="d2" min="0" max="100" value="70" step="1">
+            </label>
+            <div class="button-row">
+              <button type="button" class="primary" data-role="run-nas">Rodar o NAS (300 avaliações)</button>
+              <button type="button" data-role="run-nag" disabled>Amostrar 20 do gerador</button>
+            </div>
+          </div>
+          <p class="demo-status" data-role="status" aria-live="polite">O gerador é treinado quando esta seção abre.</p>
+          <div class="demo-panels even">
+            <div class="chart-block">
+              <div data-role="progress-chart"></div>
+              <ul class="chart-legend">
+                <li class="series-a">NAS: melhor acurácia encontrada até agora</li>
+                <li class="series-b dashed">NAG: melhor de 20 amostras</li>
+                <li class="series-muted dashed">Melhor célula (conhecida aqui por enumeração)</li>
+              </ul>
+            </div>
+            <div class="chart-block">
+              <div data-role="cost-chart"></div>
+              <ul class="chart-legend">
+                <li class="series-a">NAS: 300 avaliações por tarefa</li>
+                <li class="series-b">NAG: 4.800 para treinar uma vez, depois 20 por tarefa</li>
+              </ul>
+            </div>
+          </div>
+          <div class="cell-pair">
+            <figure>
+              <div data-role="nas-cell"></div>
+              <figcaption data-role="nas-caption">Melhor célula encontrada pelo NAS.</figcaption>
+            </figure>
+            <figure>
+              <div data-role="nag-cell"></div>
+              <figcaption data-role="nag-caption">Melhor das amostras do gerador.</figcaption>
+            </figure>
+          </div>
+          <p class="demo-readout" data-role="readout" aria-live="polite"></p>
+        </section>
+
+        <h3>O que observar</h3>
+        <ul>
+          <li>Após 300 avaliações, a busca costuma achar a melhor célula. As amostras do gerador chegam perto, em geral a menos de um ponto de acurácia, sem nenhuma busca. Só as 20 amostras são avaliadas, para escolher a melhor delas.</li>
+          <li>O gráfico de custo é a parte honesta. Treinar o gerador custou 4.800 avaliações, então ele só compensa depois de umas 17 tarefas novas. A amortização ajuda quando os problemas de projeto se repetem, não quando há um só.</li>
+          <li>Teste tarefas longe da grade de treino (dificuldade ou resolução perto de 0 ou 1). Um gerador só consegue interpolar o que as tarefas de treino cobriram.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="section" id="pillars">
+      <summary><h2 class="section-title">Os três pilares de um gerador</h2><span class="section-sub">Representação, mecanismo, orientação</span></summary>
+      <div class="section-body">
+        <p class="lede">Um método de NAG pode ser lido em três eixos interdependentes: como as arquiteturas são <strong>representadas</strong>, que <strong>mecanismo</strong> as produz e o que <strong>orienta</strong> o gerador para as boas.</p>
+
+        <h3>Representação</h3>
+        <p>Arquiteturas são grafos, em geral grafos acíclicos direcionados de operações. Um gerador precisa de um espaço onde modelá-los. As opções incluem:</p>
+        <ul>
+          <li><strong>Codificações discretas</strong>, como matrizes de adjacência com rótulos de operação. São exatas, mas difíceis de interpolar.</li>
+          <li><strong>Embeddings latentes contínuos</strong> aprendidos por autoencoders de grafos <a class="cite" href="#dvae_zhang_2019" data-cite="dvae_zhang_2019">(Zhang et al., 2019)</a> <a class="cite" href="#li2020neuralarchitectureoptimizationgraph" data-cite="li2020neuralarchitectureoptimizationgraph">(Li et al., 2020)</a> <a class="cite" href="#xiang_efficient_2023" data-cite="xiang_efficient_2023">(Xiang, 2023)</a>. São suaves e admitem gradientes, mas decodificar um ponto latente pode gerar um grafo inválido ou repetido.</li>
+          <li><strong>Tokens discretos aprendidos</strong>, como códigos vetor-quantizados que um modelo de linguagem pode gerar como sequência <a class="cite" href="#poddenige_arch-llm_2025" data-cite="poddenige_arch-llm_2025">(Poddenige et al., 2025)</a>.</li>
+          <li><strong>Estrutura probabilística</strong>: distribuições sobre os próprios componentes, como a probabilidade de cada operação em cada aresta <a class="cite" href="#muravev_neural_2021" data-cite="muravev_neural_2021">(Muravev et al., 2021)</a>. O gerador da <a href="#amortization">demonstração de amortização</a> é desse tipo.</li>
+        </ul>
+        <p>Diferente de um espaço de busca, que só lista o que é permitido, um espaço de representação modela como as arquiteturas se relacionam. Se essas representações ajudam mesmo sem supervisão é uma questão à parte <a class="cite" href="#yan2020doesunsupervisedarchitecturerepresentation" data-cite="yan2020doesunsupervisedarchitecturerepresentation">(Yan et al., 2020)</a>.</p>
+
+        <h3>Mecanismo</h3>
+        <p>Quase todas as famílias de modelos generativos já foram aplicadas a arquiteturas. As quatro minidemonstrações abaixo ilustram as ideias principais no espaço de brinquedo. Cada uma é <strong>uma ilustração do princípio, não uma reimplementação dos métodos citados</strong>.</p>
+
+        <div class="mechanisms">
+          <section class="demo mechanism" id="latent-demo" aria-labelledby="latent-title">
+            <h4 id="latent-title">Otimização latente: codificar, subir, decodificar</h4>
+            <p>Métodos como o NAO <a class="cite" href="#luo_neural_2019" data-cite="luo_neural_2019">(Luo et al., 2019)</a> embutem as arquiteturas num espaço contínuo, treinam nele um preditor de acurácia, sobem pelo gradiente do preditor e decodificam o resultado. Aqui, o eixo horizontal do mapa 2-D foi ajustado para prever acurácia e o vertical para prever tamanho, a partir de 120 células avaliadas. Cada pixel tem a cor da acurácia real da célula para a qual decodifica.</p>
+            <div class="latent-layout">
+              <figure>
+                <canvas data-role="map" role="img" aria-label="Mapa latente colorido pela acurácia real da célula decodificada; cinza indica célula degenerada" aria-describedby="latent-map-desc"></canvas>
+                <figcaption id="latent-map-desc">Clique para escolher um ponto de partida. Eixo horizontal: acurácia prevista. Eixo vertical: tamanho (células maiores para cima). Claro = acurácia real baixa, escuro = alta. Pixels cinza decodificam para uma célula degenerada. O anel marca a melhor célula real.</figcaption>
+                <div class="axis-label" aria-hidden="true"><span data-fill="latent-low"></span><span data-fill="latent-high"></span></div>
+                <div class="legend-bar seq" aria-hidden="true"></div>
+              </figure>
+              <figure>
+                <div data-role="cell"></div>
+                <figcaption data-role="cell-caption"></figcaption>
+              </figure>
+            </div>
+            <div class="controls">
+              <div class="button-row">
+                <button type="button" class="primary" data-role="climb">Subir o preditor</button>
+                <button type="button" data-role="reset">Reiniciar</button>
+              </div>
+            </div>
+            <p class="demo-readout" data-role="readout" aria-live="polite"></p>
+            <p class="note">O que observar: muitos pixels decodificam para a mesma célula, e regiões inteiras decodificam para células degeneradas. É o descompasso entre um espaço contínuo e grafos discretos. A subida também para onde o preditor suave tem seu pico, que não é onde está a melhor célula real.</p>
+          </section>
+
+          <section class="demo mechanism" id="diffusion-demo" aria-labelledby="diffusion-title">
+            <h4 id="diffusion-title">Difusão: tirar o ruído de uma célula aleatória até virar uma boa</h4>
+            <p>Modelos de difusão aprendem a reverter um processo gradual de adição de ruído <a class="cite" href="#ho2020denoisingdiffusionprobabilisticmodels" data-cite="ho2020denoisingdiffusionprobabilisticmodels">(Ho et al., 2020)</a>. Aplicados a grafos de arquitetura, um preditor pode guiar a remoção de ruído para acurácia alta <a class="cite" href="#an_diffusionnag_2024" data-cite="an_diffusionnag_2024">(An et al., 2024)</a>. Aqui, os dados de treino são um arquivo de 300 células boas, o ruído troca a operação de uma aresta ao acaso e um preditor linear ajustado no arquivo fornece a orientação.</p>
+            <div class="demo-panels even">
+              <figure>
+                <div data-role="cell"></div>
+                <figcaption data-role="step-caption">Clique em "Gerar uma" para ver uma célula se formar em 12 passos.</figcaption>
+              </figure>
+              <div class="chart-block">
+                <div data-role="chart"></div>
+                <p class="chart-caption">Barras cinza: acurácia das 300 células do arquivo. Depois de "Gerar 300", barras laranja: as células geradas. Os marcadores indicam a melhor célula do arquivo e a melhor célula real.</p>
+              </div>
+            </div>
+            <div class="controls">
+              <label class="control"><span class="label">Removedor de ruído</span>
+                <select data-role="denoiser">
+                  <option value="exact" selected>Posterior exata sobre o arquivo</option>
+                  <option value="edge">Por aresta (capacidade limitada)</option>
+                </select>
+              </label>
+              <label class="control"><span class="label">Força da orientação = <span data-role="g-value"></span></span>
+                <input type="range" data-role="guidance" min="0" max="20" value="0" step="1">
+              </label>
+              <div class="button-row">
+                <button type="button" class="primary" data-role="one">Gerar uma</button>
+                <button type="button" data-role="batch">Gerar 300</button>
+              </div>
+            </div>
+            <table class="metrics">
+              <caption>Lote gerado (veja <a href="#evaluation">avaliando um gerador</a>)</caption>
+              <tbody>
+                <tr><th scope="row">Acurácia média / melhor</th><td data-fill="diff-acc">–</td></tr>
+                <tr><th scope="row">Validade</th><td data-fill="diff-valid">–</td></tr>
+                <tr><th scope="row">Unicidade</th><td data-fill="diff-unique">–</td></tr>
+                <tr><th scope="row">Novidade (fora do arquivo)</th><td data-fill="diff-novel">–</td></tr>
+              </tbody>
+            </table>
+            <p class="note">O que observar: o removedor exato é o melhor ajuste possível aos dados de treino, mas só consegue reproduzir células do arquivo (novidade 0) <a class="cite" href="#carlini2023extractingtrainingdatadiffusion" data-cite="carlini2023extractingtrainingdatadiffusion">(Carlini et al., 2023)</a>. O removedor por aresta recombina arestas em células novas e, com orientação, pode chegar a células melhores que qualquer uma do arquivo. Uma orientação mais forte aumenta a acurácia e reduz a unicidade.</p>
+          </section>
+
+          <section class="demo mechanism" id="flow-demo" aria-labelledby="flow-title">
+            <h4 id="flow-title">GFlowNets: amostrar em proporção à recompensa</h4>
+            <p>Uma Generative Flow Network constrói um objeto passo a passo e é treinada para que objetos completos sejam amostrados com probabilidade proporcional à sua recompensa <a class="cite" href="#bengio2026gflownetfoundations" data-cite="bengio2026gflownetfoundations">(Bengio et al., 2026)</a>, o que já foi aplicado à geração de arquiteturas <a class="cite" href="#soin_generative_2025" data-cite="soin_generative_2025">(Soin et al., 2025)</a>. Aqui, a mesma política constrói uma célula uma aresta por vez, treinada com dois objetivos: aprendizado por reforço, que maximiza a recompensa esperada, e um objetivo de GFlowNet (trajectory balance) com recompensa \(R = \exp(\beta\,\text{acurácia})\).</p>
+            <div class="chart-block">
+              <div data-role="chart"></div>
+              <ul class="chart-legend">
+                <li class="series-muted dashed">Alvo: proporcional à recompensa</li>
+                <li class="series-a">GFlowNet</li>
+                <li class="series-b">Aprendizado por reforço</li>
+              </ul>
+            </div>
+            <div class="controls">
+              <div class="button-row">
+                <button type="button" class="primary" data-role="train" aria-pressed="false">Treinar as duas</button>
+                <button type="button" data-role="reset">Reiniciar</button>
+              </div>
+            </div>
+            <p class="demo-status" data-role="status" aria-live="polite">Clique em "Treinar as duas". O treino roda 200.000 episódios de construção por política.</p>
+            <table class="metrics">
+              <caption>Depois do treino</caption>
+              <thead><tr><th scope="col"></th><th scope="col">GFlowNet</th><th scope="col">Aprendizado por reforço</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Acurácia esperada</th><td data-fill="gfn-acc">–</td><td data-fill="rl-acc">–</td></tr>
+                <tr><th scope="row">Número efetivo de arquiteturas</th><td data-fill="gfn-eff">–</td><td data-fill="rl-eff">–</td></tr>
+                <tr><th scope="row">Células distintas do top 1% em 1.000 amostras</th><td data-fill="gfn-top">–</td><td data-fill="rl-top">–</td></tr>
+              </tbody>
+            </table>
+            <p class="note">O que observar: o aprendizado por reforço converge para uma única célula, uma estimativa pontual, como a busca. A GFlowNet mantém probabilidade em muitas células boas, aproximadamente em proporção à recompensa, então suas amostras continuam diversas.</p>
+          </section>
+
+          <section class="demo mechanism" id="pareto-demo" aria-labelledby="pareto-title">
+            <h4 id="pareto-title">Geração condicionada ao orçamento: um modelo, todos os orçamentos</h4>
+            <p>A implantação acrescenta restrições como tamanho, latência ou energia. Em vez de uma busca por orçamento, geradores cientes de Pareto aprendem \(p_\theta(A \mid \lambda)\) para toda uma faixa de orçamentos \(\lambda\) <a class="cite" href="#guo_pareto-aware_2023" data-cite="guo_pareto-aware_2023">(Guo et al., 2022)</a> <a class="cite" href="#lomurno_pomonag_2024" data-cite="lomurno_pomonag_2024">(Lomurno et al., 2024)</a>. Aqui, um gerador foi treinado em dez orçamentos. Mova o controle para pedir qualquer orçamento, inclusive os que ele nunca viu.</p>
+            <figure>
+              <canvas data-role="plot" role="img" aria-label="Acurácia versus número de parâmetros para cada célula válida, com a fronteira de Pareto e as amostras atuais" aria-describedby="pareto-desc"></canvas>
+              <figcaption id="pareto-desc">Cada célula válida (cinza), a fronteira de Pareto exata (linha), o orçamento (tracejado) e 50 amostras do gerador (azul se dentro do orçamento, laranja se acima).</figcaption>
+            </figure>
+            <div class="controls">
+              <label class="control grow"><span class="label">Orçamento: <span data-role="budget-value"></span> M parâmetros</span>
+                <input type="range" data-role="budget" min="20" max="155" value="60" step="1">
+              </label>
+            </div>
+            <p class="demo-readout" data-role="readout" aria-live="polite"></p>
+            <p class="note">O que observar: as amostras acompanham o orçamento enquanto ele se move, sem retreino e sem busca. Nem toda amostra cabe, porque este gerador pequeno escolhe cada aresta de forma independente, mas o tamanho de uma célula é de graça de calcular, então as amostras acima do orçamento são simplesmente descartadas antes de qualquer treino.</p>
+          </section>
+        </div>
+
+        <p>Outras famílias de geradores incluem geradores adversariais <a class="cite" href="#rezaei_2021_generative" data-cite="rezaei_2021_generative">(Rezaei et al., 2021)</a>, redes de grafos que emitem uma arquitetura inteira em um passo <a class="cite" href="#agiollo_gnn2gnn_2022" data-cite="agiollo_gnn2gnn_2022">(Agiollo &amp; Omicini, 2022)</a> <a class="cite" href="#liang_automating_2022" data-cite="liang_automating_2022">(Liang &amp; Sun, 2022)</a>, variantes de difusão com amostragem evolutiva <a class="cite" href="#zhou_evolution_2025" data-cite="zhou_evolution_2025">(Zhou et al., 2025)</a> ou progressiva <a class="cite" href="#zhang_progressive_2025" data-cite="zhang_progressive_2025">(Zhang &amp; Zhuang, 2025)</a>, e modelos de linguagem ajustados com códigos de arquitetura <a class="cite" href="#poddenige_arch-llm_2025" data-cite="poddenige_arch-llm_2025">(Poddenige et al., 2025)</a>.</p>
+
+        <h3>Orientação</h3>
+        <p>O que puxa um gerador para boas arquiteturas? Os estudos se dividem em dois grupos:</p>
+        <ul>
+          <li><strong>Guiados por preditor</strong>: um modelo substituto estima a acurácia e fornece gradientes ou notas que guiam a geração, como nas demonstrações latente e de difusão acima. O DiffusionNAG é um exemplo <a class="cite" href="#an_diffusionnag_2024" data-cite="an_diffusionnag_2024">(An et al., 2024)</a>.</li>
+          <li><strong>Sem preditor</strong>: a orientação vem de condicionamento embutido no treino, de priors estruturais ou de avaliações reais convertidas em recompensas, como na demonstração da GFlowNet. Exemplos incluem a orientação sem classificador em difusão de grafos <a class="cite" href="#asthana_multi-conditioned_2024" data-cite="asthana_multi-conditioned_2024">(Asthana et al., 2024)</a> e a geração baseada em GFlowNets <a class="cite" href="#soin_generative_2025" data-cite="soin_generative_2025">(Soin et al., 2025)</a>.</li>
+        </ul>
+        <p>Em ambos os casos, o passo que define a mudança do NAS para a NAG é que o sinal de desempenho é <em>internalizado</em> nos parâmetros do gerador, em vez de agir como um filtro externo depois do fato.</p>
+        <p class="note">Alguns sistemas que propõem e criticam arquiteturas com grandes modelos de linguagem <a class="cite" href="#rahman2024lemonademultiparameterneuralarchitecture" data-cite="rahman2024lemonademultiparameterneuralarchitecture">(Rahman &amp; Chakraborty, 2024)</a> <a class="cite" href="#yang_nader_2025" data-cite="yang_nader_2025">(Yang et al., 2025)</a> escapam de espaços de busca fixos, mas ainda dependem de ciclos iterativos de avaliar e refinar, então se comportam mais como busca do que como um modelo generativo aprendido.</p>
+      </div>
+    </details>
+
+    <details class="section" id="evaluation">
+      <summary><h2 class="section-title">Avaliando um gerador</h2><span class="section-sub">Julgar uma distribuição, não uma única vencedora</span></summary>
+      <div class="section-body">
+        <p class="lede">Resultados de NAS costumam ser resumidos pela melhor arquitetura encontrada e pelo seu custo. Um gerador produz uma distribuição, e um único número não descreve uma distribuição.</p>
+        <h3>Métricas emprestadas da modelagem generativa</h3>
+        <ul>
+          <li><strong>Validade, unicidade, novidade.</strong> As amostras são grafos bem formados? São diferentes entre si? São diferentes dos dados de treino <a class="cite" href="#dvae_zhang_2019" data-cite="dvae_zhang_2019">(Zhang et al., 2019)</a> <a class="cite" href="#poddenige_arch-llm_2025" data-cite="poddenige_arch-llm_2025">(Poddenige et al., 2025)</a>? A <a href="#diffusion-demo">demonstração de difusão</a> mostra as três e como um modelo pode ter validade perfeita e novidade zero.</li>
+          <li><strong>Fidelidade e diversidade.</strong> Precisão e revocação separam "as amostras parecem boas arquiteturas reais" de "as amostras cobrem todas elas" <a class="cite" href="#sajjadi2018assessinggenerativemodelsprecision" data-cite="sajjadi2018assessinggenerativemodelsprecision">(Sajjadi et al., 2018)</a> <a class="cite" href="#kynkaanniemi2019improvedprecisionrecallmetric" data-cite="kynkaanniemi2019improvedprecisionrecallmetric">(Kynkäänniemi et al., 2019)</a>. Densidade e cobertura são mais robustas a valores atípicos <a class="cite" href="#reliablefidelitydiversitymetrics_2020" data-cite="reliablefidelitydiversitymetrics_2020">(Naeem et al., 2020)</a>.</li>
+          <li><strong>Divergências.</strong> A KL direta penaliza um gerador que deixa de cobrir regiões boas. A KL reversa penaliza um que põe massa em regiões ruins. Elas se complementam, e ranquear modelos por uma só métrica pode enganar <a class="cite" href="#theis2016noteevaluationgenerativemodels" data-cite="theis2016noteevaluationgenerativemodels">(Theis et al., 2016)</a> <a class="cite" href="#betzalel2022studyevaluationgenerativemodels" data-cite="betzalel2022studyevaluationgenerativemodels">(Betzalel et al., 2022)</a>.</li>
+          <li><strong>Alinhamento com a recompensa e eficiência de consultas.</strong> O quanto as frequências de amostragem acompanham o desempenho real <a class="cite" href="#soin_generative_2025" data-cite="soin_generative_2025">(Soin et al., 2025)</a>, e quantas avaliações caras o treino exigiu <a class="cite" href="#lukasiv2022learningwheretolook" data-cite="lukasiv2022learningwheretolook">(Lukasik et al., 2022)</a>.</li>
+        </ul>
+        <h3>O paradoxo dos benchmarks</h3>
+        <p>Benchmarks tabulares como o NAS-Bench-101 <a class="cite" href="#ying2019nasbench101reproducibleneuralarchitecture" data-cite="ying2019nasbench101reproducibleneuralarchitecture">(Ying et al., 2019)</a> e o NAS-Bench-201 <a class="cite" href="#dong2020nasbench201extendingscopereproducible" data-cite="dong2020nasbench201extendingscopereproducible">(Dong &amp; Yang, 2020)</a> guardam a acurácia treinada de cada arquitetura de um espaço fixo, então qualquer método pode ser pontuado por consulta. Isso dá reprodutibilidade e comparação justa, mas só se o gerador ficar confinado a esse espaço fixo, o que elimina justamente aquilo em que a NAG deveria ser boa: gerar além dele.</p>
+        <p>As alternativas têm seus próprios problemas. Treinar cada modelo gerado faz os resultados dependerem das receitas de treino <a class="cite" href="#yang2020nasevaluationfrustratinglyhard" data-cite="yang2020nasevaluationfrustratinglyhard">(Yang et al., 2020)</a>. Pontuar com um preditor substituto importa os vieses do preditor, e um preditor treinado em projetos conhecidos tende a subestimar os novos, a mesma falha encontrada em métricas baseadas em features para imagens <a class="cite" href="#stein2023exposingflawsgenerativemodel" data-cite="stein2023exposingflawsgenerativemodel">(Stein et al., 2023)</a>.</p>
+      </div>
+    </details>
+
+    <details class="section" id="open-problems">
+      <summary><h2 class="section-title">Problemas em aberto</h2><span class="section-sub">Para onde a área está indo</span></summary>
+      <div class="section-body">
+        <p class="lede">A NAG é jovem, e vários desafios ainda limitam sua confiabilidade e adoção.</p>
+        <div class="problem-cards">
+          <article class="problem-card">
+            <h3>Validade por construção</h3>
+            <p>Espaços latentes contínuos e a remoção estocástica de ruído podem produzir grafos que não são redes válidas, então as amostras muitas vezes precisam de reparo ou rejeição. Embutir restrições como aciclicidade e conectividade no próprio processo de geração é uma direção em aberto. Tokens discretos aprendidos são uma primeira tentativa <a class="cite" href="#poddenige_arch-llm_2025" data-cite="poddenige_arch-llm_2025">(Poddenige et al., 2025)</a>.</p>
+          </article>
+          <article class="problem-card">
+            <h3>Além dos espaços de busca fechados</h3>
+            <p>A maioria dos geradores ainda opera sobre os conjuntos fixos de operações dos espaços de benchmark, então os ganhos podem refletir uma interpolação melhor dentro de uma tabela, e não novos princípios de projeto. Faltam protocolos de avaliação feitos para modelos generativos, que meçam diversidade, transferência e controlabilidade.</p>
+          </article>
+          <article class="problem-card">
+            <h3>Orientação confiável</h3>
+            <p>As paisagens arquitetura–desempenho são grandes e acidentadas, e um único preditor substituto raramente generaliza sobre elas, então os geradores podem acabar otimizando os erros do preditor. Orientação progressiva a partir de conjuntos de preditores mais fracos é uma resposta <a class="cite" href="#zhang_progressive_2025" data-cite="zhang_progressive_2025">(Zhang &amp; Zhuang, 2025)</a>.</p>
+          </article>
+          <article class="problem-card">
+            <h3>Qualquer orçamento, na hora</h3>
+            <p>Idealmente, um único gerador levaria qualquer orçamento de hardware a uma arquitetura quase ótima e compartilharia estrutura entre orçamentos, como na <a href="#pareto-demo">demonstração de orçamento</a>, em vez de tratar cada orçamento como um problema separado <a class="cite" href="#guo_pareto-aware_2023" data-cite="guo_pareto-aware_2023">(Guo et al., 2022)</a> <a class="cite" href="#lomurno_pomonag_2024" data-cite="lomurno_pomonag_2024">(Lomurno et al., 2024)</a>.</p>
+          </article>
+          <article class="problem-card">
+            <h3>Priors arquiteturais zero-shot</h3>
+            <p>A maioria dos geradores precisa de milhares de arquiteturas avaliadas antes de ser útil. Priors extraídos de benchmarks existentes <a class="cite" href="#xie_prior_2025" data-cite="xie_prior_2025">(Xie et al., 2025)</a> e dinâmicas evolutivas com pouco treino <a class="cite" href="#zhou_evolution_2025" data-cite="zhou_evolution_2025">(Zhou et al., 2025)</a> reduzem esse começo a frio. O objetivo de longo prazo é uma distribuição de fundação sobre arquiteturas que funcione entre tarefas.</p>
+          </article>
+          <article class="problem-card">
+            <h3>Explicar os projetos gerados</h3>
+            <p>Arquiteturas geradas raramente vêm com uma justificativa. Ciclos de crítica no estilo de agentes, que justificam cada escolha de projeto <a class="cite" href="#yang_nader_2025" data-cite="yang_nader_2025">(Yang et al., 2025)</a>, apontam para geradores cujas decisões podem ser inspecionadas, o que importa para a confiança e para aprender algo com o que eles produzem.</p>
+          </article>
+        </div>
+      </div>
+    </details>
+
+    <details class="section" id="about">
+      <summary><h2 class="section-title">Sobre o estudo</h2><span class="section-sub">O artigo por trás desta página</span></summary>
+      <div class="section-body">
+        <p>Esta página se baseia em <strong>From Search to Synthesis: A Systematic Mapping Study of Neural Architecture Generation</strong>, de Thiago C. S. Barbieri, Edesio Alcobaça e André C. P. L. F. de Carvalho (Instituto de Ciências Matemáticas e de Computação, Universidade de São Paulo). O manuscrito está atualmente <strong>em revisão</strong>, e um link será adicionado aqui quando for publicado.</p>
+        <p>A página se apoia na formulação e na bibliografia do estudo. As demonstrações e todos os seus números foram feitos para esta página.</p>
+      </div>
+    </details>
+
+    <details class="section" id="references">
+      <summary><h2 class="section-title">Referências</h2><span class="section-sub">Todos os trabalhos citados nesta página</span></summary>
+      <div class="section-body">
+        <!-- references:start (generated by scripts/build-page.js; do not edit) -->
+        <ol class="bibliography">
+          <li id="agiollo_gnn2gnn_2022">
+            Agiollo, A., Omicini, A. (2022). GNN2GNN: Graph neural networks to generate neural networks. <em>Proceedings of the Thirty-Eighth Conference on Uncertainty in Artificial Intelligence</em> 180, 32–42. <a href="https://proceedings.mlr.press/v180/agiollo22a.html">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="an_diffusionnag_2024">
+            An, S., Lee, H., Jo, J., Lee, S., Hwang, S. J. (2024). DiffusionNAG: Predictor-guided Neural Architecture Generation with Diffusion Models. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.2305.16943">doi:10.48550/arXiv.2305.16943</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="asthana_multi-conditioned_2024">
+            Asthana, R., Conrad, J., Dawoud, Y., Ortmanns, M., Belagiannis, V. (2024). Multi-conditioned Graph Diffusion for Neural Architecture Search. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.2403.06020">doi:10.48550/arXiv.2403.06020</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="BAYMURZINA202282">
+            Baymurzina, D., Golikov, E., Burtsev, M. (2022). A review of neural architecture search. <em>Neurocomputing</em> 474, 82–93. <a href="https://doi.org/10.1016/j.neucom.2021.12.014">doi:10.1016/j.neucom.2021.12.014</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="bengio2026gflownetfoundations">
+            Bengio, Y., Lahlou, S., Deleu, T., Hu, E. J., Tiwari, M., Bengio, E. (2026). GFlowNet Foundations. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2111.09266">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="pmlr-v28-bergstra13">
+            Bergstra, J., Yamins, D., Cox, D. (2013). Making a Science of Model Search: Hyperparameter Optimization in Hundreds of Dimensions for Vision Architectures. <em>Proceedings of the 30th International Conference on Machine Learning</em> 28, 115–123. <a href="https://proceedings.mlr.press/v28/bergstra13.html">link</a>
+            <span class="cited-on">Citado em: <a href="#motivation">Por que automatizar o projeto de arquiteturas?</a></span>
+          </li>
+          <li id="betzalel2022studyevaluationgenerativemodels">
+            Betzalel, E., Penso, C., Navon, A., Fetaya, E. (2022). A Study on the Evaluation of Generative Models. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2206.10935">link</a>
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="cai2019once">
+            Cai, H., Gan, C., Wang, T., Zhang, Z., Han, S. (2020). Once-for-All: Train One Network and Specialize it for Efficient Deployment. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1908.09791">link</a>
+            <span class="cited-on">Citado em: <a href="#amortization">Amortização: pagar uma vez, amostrar muitas</a></span>
+          </li>
+          <li id="carlini2023extractingtrainingdatadiffusion">
+            Carlini, N., Hayes, J., Nasr, M., Jagielski, M., Sehwag, V., Tramèr, F., Balle, B., Ippolito, D., Wallace, E. (2023). Extracting Training Data from Diffusion Models. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2301.13188">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="domhan2015sahodnn">
+            Domhan, T., Springenberg, J. T., Hutter, F. (2015). Speeding up automatic hyperparameter optimization of deep neural networks by extrapolation of learning curves. <em>Proceedings of the 24th International Conference on Artificial Intelligence</em> , 3460–3468. <a href="https://dl.acm.org/doi/10.5555/2832581.2832731">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="dong2020nasbench201extendingscopereproducible">
+            Dong, X., Yang, Y. (2020). NAS-Bench-201: Extending the Scope of Reproducible Neural Architecture Search. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2001.00326">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a>, <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="elskensurvey2019">
+            Elsken, T., Metzen, J. H., Hutter, F. (2019). Neural architecture search: a survey. <em>J. Mach. Learn. Res.</em> 20(1), 1997–2017.
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="guo_pareto-aware_2023">
+            Guo, Y., Chen, Y., Zheng, Y., Chen, Q., Zhao, P., Chen, J., Huang, J., Tan, M. (2022). Pareto-aware Neural Architecture Generation for Diverse Computational Budgets. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2210.07634">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a>, <a href="#open-problems">Problemas em aberto</a></span>
+          </li>
+          <li id="he2016">
+            He, K., Zhang, X., Ren, S., Sun, J. (2016). Deep Residual Learning for Image Recognition. <em>2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)</em> , 770–778. <a href="https://doi.org/10.1109/CVPR.2016.90">doi:10.1109/CVPR.2016.90</a>
+            <span class="cited-on">Citado em: <a href="#motivation">Por que automatizar o projeto de arquiteturas?</a></span>
+          </li>
+          <li id="navigator-d3_hemmi2024">
+            Hemmi, K., Tanigaki, Y., Onishi, M. (2024). NAVIGATOR-D3: Neural Architecture Search Using Variational Graph Auto-encoder Toward Optimal Architecture Design for Diverse Datasets. <em>Artificial Neural Networks and Machine Learning – ICANN 2024</em> , 292–307.
+            <span class="cited-on">Citado em: <a href="#amortization">Amortização: pagar uma vez, amostrar muitas</a></span>
+          </li>
+          <li id="ho2020denoisingdiffusionprobabilisticmodels">
+            Ho, J., Jain, A., Abbeel, P. (2020). Denoising Diffusion Probabilistic Models. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2006.11239">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="Krizhevsky2017imagenet">
+            Krizhevsky, A., Sutskever, I., Hinton, G. E. (2017). ImageNet classification with deep convolutional neural networks. <em>Commun. ACM</em> 60(6), 84–90. <a href="https://doi.org/10.1145/3065386">doi:10.1145/3065386</a>
+            <span class="cited-on">Citado em: <a href="#motivation">Por que automatizar o projeto de arquiteturas?</a></span>
+          </li>
+          <li id="kynkaanniemi2019improvedprecisionrecallmetric">
+            Kynkäänniemi, T., Karras, T., Laine, S., Lehtinen, J., Aila, T. (2019). Improved Precision and Recall Metric for Assessing Generative Models. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1904.06991">link</a>
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="lee2021rapidneuralarchitecturesearch">
+            Lee, H., Hyung, E., Hwang, S. J. (2021). Rapid Neural Architecture Search by Learning to Generate Graphs from Datasets. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2107.00860">link</a>
+            <span class="cited-on">Citado em: <a href="#search-to-generation">Da busca à geração</a>, <a href="#amortization">Amortização: pagar uma vez, amostrar muitas</a></span>
+          </li>
+          <li id="li2020neuralarchitectureoptimizationgraph">
+            Li, J., Liu, Y., Liu, J., Wang, W. (2020). Neural Architecture Optimization with Graph VAE. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2006.10310">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="li2018hyperbandnovelbanditbasedapproach">
+            Li, L., Jamieson, K., DeSalvo, G., Rostamizadeh, A., Talwalkar, A. (2018). Hyperband: A Novel Bandit-Based Approach to Hyperparameter Optimization. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1603.06560">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="litalwalkar2020randomsearch">
+            Li, L., Talwalkar, A. (2020). Random Search and Reproducibility for Neural Architecture Search. <em>Proceedings of The 35th Uncertainty in Artificial Intelligence Conference</em> 115, 367–377. <a href="https://proceedings.mlr.press/v115/li20c.html">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="liang_automating_2022">
+            Liang, Z., Sun, Y. (2022). Automating Neural Architecture Design without Search. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.2204.11838">doi:10.48550/arXiv.2204.11838</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="liu2019dartsdifferentiablearchitecturesearch">
+            Liu, H., Simonyan, K., Yang, Y. (2019). DARTS: Differentiable Architecture Search. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1806.09055">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="lomurno_pomonag_2024">
+            Lomurno, E., Mariani, S., Monti, M., Matteucci, M. (2024). POMONAG: Pareto-Optimal Many-Objective Neural Architecture Generator. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.2409.20447">doi:10.48550/arXiv.2409.20447</a>
+            <span class="cited-on">Citado em: <a href="#search-to-generation">Da busca à geração</a>, <a href="#pillars">Os três pilares de um gerador</a>, <a href="#open-problems">Problemas em aberto</a></span>
+          </li>
+          <li id="lukasiv2022learningwheretolook">
+            Lukasik, J., Jung, S., Keuper, M. (2022). Learning Where to Look – Generative NAS is Surprisingly Efficient. <em>Computer Vision – ECCV 2022</em> , 257–273.
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="luo_neural_2019">
+            Luo, R., Tian, F., Qin, T., Chen, E., Liu, T.-Y. (2019). Neural Architecture Optimization. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.1808.07233">doi:10.48550/arXiv.1808.07233</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="muravev_neural_2021">
+            Muravev, A., Raitoharju, J., Gabbouj, M. (2021). Neural Architecture Search by Estimation of Network Structure Distributions. <em>IEEE Access</em> 9, 15304–15319. <a href="https://doi.org/10.1109/ACCESS.2021.3052996">doi:10.1109/ACCESS.2021.3052996</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="reliablefidelitydiversitymetrics_2020">
+            Naeem, M. F., Oh, S. J., Uh, Y., Choi, Y., Yoo, J. (2020). Reliable fidelity and diversity metrics for generative models. <em>Proceedings of the 37th International Conference on Machine Learning (ICML)</em>.
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="pmlr-v80-pham18a">
+            Pham, H., Guan, M., Zoph, B., Le, Q., Dean, J. (2018). Efficient Neural Architecture Search via Parameters Sharing. <em>Proceedings of the 35th International Conference on Machine Learning</em> 80, 4095–4104. <a href="https://proceedings.mlr.press/v80/pham18a.html">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="poddenige_arch-llm_2025">
+            Poddenige, D. G., Seneviratne, S., Senanayake, D., Niranjan, M., Suganthan, P. N., Halgamuge, S. (2025). Arch-LLM: Taming LLMs for Neural Architecture Generation via Unsupervised Discrete Representation Learning. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.2503.22063">doi:10.48550/arXiv.2503.22063</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a>, <a href="#evaluation">Avaliando um gerador</a>, <a href="#open-problems">Problemas em aberto</a></span>
+          </li>
+          <li id="rahman2024lemonademultiparameterneuralarchitecture">
+            Rahman, M. H., Chakraborty, P. (2024). LeMo-NADe: Multi-Parameter Neural Architecture Discovery with LLMs. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2402.18443">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="real2017largescaleev">
+            Real, E., Moore, S., Selle, A., Saxena, S., Suematsu, Y. L., Tan, J., Le, Q., Kurakin, A. (2017). Large-Scale Evolution of Image Classifiers. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1703.01041">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="real2019">
+            Real, E., Aggarwal, A., Huang, Y., Le, Q. V. (2019). Regularized evolution for image classifier architecture search. <em>Proceedings of the AAAI Conference on Artificial Intelligence</em>. <a href="https://doi.org/10.1609/aaai.v33i01.33014780">doi:10.1609/aaai.v33i01.33014780</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="rezaei_2021_generative">
+            Rezaei, S. S. C., Han, F. X., Niu, D., Salameh, M., Mills, K., Lian, S., Lu, W., Jui, S. (2021). Generative Adversarial Neural Architecture Search. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.2105.09356">doi:10.48550/arXiv.2105.09356</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="sajjadi2018assessinggenerativemodelsprecision">
+            Sajjadi, M. S. M., Bachem, O., Lucic, M., Bousquet, O., Gelly, S. (2018). Assessing Generative Models via Precision and Recall. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1806.00035">link</a>
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="soin_generative_2025">
+            Soin, H., Tripura, T., Chakraborty, S. (2025). Generative flow induced neural architecture search: Towards discovering optimal architecture in wavelet neural operator. <em>Computer Physics Communications</em> 316, 109755. <a href="https://doi.org/10.1016/j.cpc.2025.109755">doi:10.1016/j.cpc.2025.109755</a>
+            <span class="cited-on">Citado em: <a href="#search-to-generation">Da busca à geração</a>, <a href="#pillars">Os três pilares de um gerador</a>, <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="stein2023exposingflawsgenerativemodel">
+            Stein, G., Cresswell, J. C., Hosseinzadeh, R., Sui, Y., Ross, B. L., Villecroze, V., Liu, Z., Caterini, A. L., Taylor, J. E. T., Loaiza-Ganem, G. (2023). Exposing flaws of generative model evaluation metrics and their unfair treatment of diffusion models. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2306.04675">link</a>
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="theis2016noteevaluationgenerativemodels">
+            Theis, L., van den Oord, A., Bethge, M. (2016). A note on the evaluation of generative models. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1511.01844">link</a>
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="attentionisallyouneed2017">
+            Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., Polosukhin, I. (2017). Attention is all you need. <em>Proceedings of the 31st International Conference on Neural Information Processing Systems</em> , 6000–6010.
+            <span class="cited-on">Citado em: <a href="#motivation">Por que automatizar o projeto de arquiteturas?</a></span>
+          </li>
+          <li id="white2020bananasbayesianoptimizationneural">
+            White, C., Neiswanger, W., Savani, Y. (2020). BANANAS: Bayesian Optimization with Neural Architectures for Neural Architecture Search. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1910.11858">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="white2023neuralarchitecturesearchinsights">
+            White, C., Safari, M., Sukthanker, R., Ru, B., Elsken, T., Zela, A., Dey, D., Hutter, F. (2023). Neural Architecture Search: Insights from 1000 Papers. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2301.08727">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="xiang_efficient_2023">
+            Xiang, L. (2023). Efficient Automated Neural Architecture Design. <em>PhD thesis, University of Warwick</em>. <a href="https://wrap.warwick.ac.uk/187420">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="xie_prior_2025">
+            Xie, J., Ji, H., Sun, Y. (2025). Prior Knowledge Guided Neural Architecture Generation. <em>Proceedings of the 42nd International Conference on Machine Learning</em> 267, 68671–68686. <a href="https://proceedings.mlr.press/v267/xie25f.html">link</a>
+            <span class="cited-on">Citado em: <a href="#open-problems">Problemas em aberto</a></span>
+          </li>
+          <li id="yan2020doesunsupervisedarchitecturerepresentation">
+            Yan, S., Zheng, Y., Ao, W., Zeng, X., Zhang, M. (2020). Does Unsupervised Architecture Representation Learning Help Neural Architecture Search?. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/2006.06936">link</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a></span>
+          </li>
+          <li id="yang2020nasevaluationfrustratinglyhard">
+            Yang, A., Esperança, P. M., Carlucci, F. M. (2020). NAS evaluation is frustratingly hard. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1912.12522">link</a>
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="yang_nader_2025">
+            Yang, Z., Zeng, W., Jin, S., Qian, C., Luo, P., Liu, W. (2025). NADER: Neural Architecture Design via Multi-Agent Collaboration. <em>2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)</em> , 4452–4461. <a href="https://doi.org/10.1109/CVPR52734.2025.00420">doi:10.1109/CVPR52734.2025.00420</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a>, <a href="#open-problems">Problemas em aberto</a></span>
+          </li>
+          <li id="ying2019nasbench101reproducibleneuralarchitecture">
+            Ying, C., Klein, A., Real, E., Christiansen, E., Murphy, K., Hutter, F. (2019). NAS-Bench-101: Towards Reproducible Neural Architecture Search. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1902.09635">link</a>
+            <span class="cited-on">Citado em: <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="yu2019evaluatingsearchphaseneural">
+            Yu, K., Sciuto, C., Jaggi, M., Musat, C., Salzmann, M. (2019). Evaluating the Search Phase of Neural Architecture Search. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1902.08142">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="dvae_zhang_2019">
+            Zhang, M., Jiang, S., Cui, Z., Garnett, R., Chen, Y. (2019). D-VAE: a variational autoencoder for directed acyclic graphs. <em>Proceedings of the 33rd International Conference on Neural Information Processing Systems</em> , 1588–1600.
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a>, <a href="#evaluation">Avaliando um gerador</a></span>
+          </li>
+          <li id="zhang_progressive_2025">
+            Zhang, Z., Zhuang, L. (2025). Progressive Neural Architecture Generation with Weaker Predictors. <em>MultiMedia Modeling</em> , 229–242. <a href="https://doi.org/10.1007/978-981-96-2064-7_17">doi:10.1007/978-981-96-2064-7_17</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a>, <a href="#open-problems">Problemas em aberto</a></span>
+          </li>
+          <li id="zhou_evolution_2025">
+            Zhou, B., Yu, C., Tang, C. (2025). Evolution Meets Diffusion: Efficient Neural Architecture Generation. <em>arXiv preprint</em>. <a href="https://doi.org/10.48550/arXiv.2504.17827">doi:10.48550/arXiv.2504.17827</a>
+            <span class="cited-on">Citado em: <a href="#pillars">Os três pilares de um gerador</a>, <a href="#open-problems">Problemas em aberto</a></span>
+          </li>
+          <li id="zoph2017neuralarchitecturesearchreinforcement">
+            Zoph, B., Le, Q. V. (2017). Neural Architecture Search with Reinforcement Learning. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1611.01578">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+          <li id="zoph2018learningtransferablearchitecturesscalable">
+            Zoph, B., Vasudevan, V., Shlens, J., Le, Q. V. (2018). Learning Transferable Architectures for Scalable Image Recognition. <em>arXiv preprint</em>. <a href="https://arxiv.org/abs/1707.07012">link</a>
+            <span class="cited-on">Citado em: <a href="#nas">Busca: a visão do NAS</a></span>
+          </li>
+        </ol>
+        <!-- references:end -->
+      </div>
+    </details>
+  </main>
+  <footer class="site-footer">
+    <p>Feito por Thiago Barbieri como parte de pesquisa de doutorado em IA na Universidade de São Paulo (USP). <a href="https://github.com/barbieriht">GitHub</a> · <a href="https://www.linkedin.com/in/barbieriht/">LinkedIn</a><br>Desenvolvido com o auxílio do <a href="https://claude.com/claude-code">Claude Code</a>.</p>
+  </footer>
+  <script src="assets/vendor/katex/katex.min.js" defer></script>
+  <script src="assets/vendor/katex/auto-render.min.js" defer></script>
+  <script src="assets/vendor/d3/d3.min.js" defer></script>
+  <script src="assets/js/math.js" defer></script>
+  <script src="assets/js/i18n.js" defer></script>
+  <script src="assets/js/sections.js" defer></script>
+  <script src="assets/js/space.js" defer></script>
+  <script src="assets/js/metrics.js" defer></script>
+  <script src="assets/js/generator.js" defer></script>
+  <script src="assets/js/search.js" defer></script>
+  <script src="assets/js/flow.js" defer></script>
+  <script src="assets/js/diffusion.js" defer></script>
+  <script src="assets/js/latent.js" defer></script>
+  <script src="assets/js/pareto.js" defer></script>
+  <script src="assets/js/charts.js" defer></script>
+  <script src="assets/js/cell-view.js" defer></script>
+  <script src="assets/js/space-demo.js" defer></script>
+  <script src="assets/js/beta-demo.js" defer></script>
+  <script src="assets/js/amortization-demo.js" defer></script>
+  <script src="assets/js/latent-demo.js" defer></script>
+  <script src="assets/js/diffusion-demo.js" defer></script>
+  <script src="assets/js/flow-demo.js" defer></script>
+  <script src="assets/js/pareto-demo.js" defer></script>
+</body>
+</html>
