@@ -12,7 +12,7 @@
   if (!root) return;
 
   const BUDGET = 300;          // evaluations per NAS run
-  const NAG_SAMPLES = 20;      // samples drawn (and evaluated) per new task
+  const NAG_SAMPLES = 10;      // samples drawn (and evaluated) per new task
   const BETA = 2;              // weight exp(BETA * (R - R_best)) in training
   const EPOCHS = 200;
   const EPOCHS_PER_FRAME = 4;

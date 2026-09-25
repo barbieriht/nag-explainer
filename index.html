@@ -187,7 +187,7 @@
             </label>
             <div class="button-row">
               <button type="button" class="primary" data-role="run-nas">Run NAS (300 evaluations)</button>
-              <button type="button" data-role="run-nag" disabled>Sample 20 from the generator</button>
+              <button type="button" data-role="run-nag" disabled>Sample 10 from the generator</button>
             </div>
           </div>
           <p class="demo-status" data-role="status" aria-live="polite">The generator trains when this section opens.</p>
@@ -196,7 +196,7 @@
               <div data-role="progress-chart"></div>
               <ul class="chart-legend">
                 <li class="series-a">NAS: best accuracy found so far</li>
-                <li class="series-b dashed">NAG: best of 20 samples</li>
+                <li class="series-b dashed">NAG: best of 10 samples</li>
                 <li class="series-muted dashed">Best cell (known here by enumeration)</li>
               </ul>
             </div>
@@ -204,7 +204,7 @@
               <div data-role="cost-chart"></div>
               <ul class="chart-legend">
                 <li class="series-a">NAS: 300 evaluations per task</li>
-                <li class="series-b">NAG: 4,800 to train once, then 20 per task</li>
+                <li class="series-b">NAG: 4,800 to train once, then 10 per task</li>
               </ul>
             </div>
           </div>
@@ -223,7 +223,7 @@
 
         <h3>What to look for</h3>
         <ul>
-          <li>After 300 evaluations, the search usually finds the very best cell. The generator's samples come close, typically within a point of accuracy, without any search. Only its 20 samples are evaluated, to pick the best of them.</li>
+          <li>After 300 evaluations, the search usually finds the very best cell. The generator's samples come close, typically within a point of accuracy, without any search. Only its 10 samples are evaluated, to pick the best of them.</li>
           <li>The cost chart is the honest part. Training the generator took 4,800 evaluations, so it only pays off after about 17 new tasks. Amortization helps when design problems repeat, not when there is only one.</li>
           <li>Try tasks far from the training grid (difficulty or resolution near 0 or 1). A generator can only interpolate what its training tasks covered.</li>
         </ul>

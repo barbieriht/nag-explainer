@@ -187,7 +187,7 @@
             </label>
             <div class="button-row">
               <button type="button" class="primary" data-role="run-nas">Rodar o NAS (300 avaliações)</button>
-              <button type="button" data-role="run-nag" disabled>Amostrar 20 do gerador</button>
+              <button type="button" data-role="run-nag" disabled>Amostrar 10 do gerador</button>
             </div>
           </div>
           <p class="demo-status" data-role="status" aria-live="polite">O gerador é treinado quando esta seção abre.</p>
@@ -196,7 +196,7 @@
               <div data-role="progress-chart"></div>
               <ul class="chart-legend">
                 <li class="series-a">NAS: melhor acurácia encontrada até agora</li>
-                <li class="series-b dashed">NAG: melhor de 20 amostras</li>
+                <li class="series-b dashed">NAG: melhor de 10 amostras</li>
                 <li class="series-muted dashed">Melhor célula (conhecida aqui por enumeração)</li>
               </ul>
             </div>
@@ -204,7 +204,7 @@
               <div data-role="cost-chart"></div>
               <ul class="chart-legend">
                 <li class="series-a">NAS: 300 avaliações por tarefa</li>
-                <li class="series-b">NAG: 4.800 para treinar uma vez, depois 20 por tarefa</li>
+                <li class="series-b">NAG: 4.800 para treinar uma vez, depois 10 por tarefa</li>
               </ul>
             </div>
           </div>
@@ -223,7 +223,7 @@
 
         <h3>O que observar</h3>
         <ul>
-          <li>Após 300 avaliações, a busca costuma achar a melhor célula. As amostras do gerador chegam perto, em geral a menos de um ponto de acurácia, sem nenhuma busca. Só as 20 amostras são avaliadas, para escolher a melhor delas.</li>
+          <li>Após 300 avaliações, a busca costuma achar a melhor célula. As amostras do gerador chegam perto, em geral a menos de um ponto de acurácia, sem nenhuma busca. Só as 10 amostras são avaliadas, para escolher a melhor delas.</li>
           <li>O gráfico de custo é a parte honesta. Treinar o gerador custou 4.800 avaliações, então ele só compensa depois de umas 17 tarefas novas. A amortização ajuda quando os problemas de projeto se repetem, não quando há um só.</li>
           <li>Teste tarefas longe da grade de treino (dificuldade ou resolução perto de 0 ou 1). Um gerador só consegue interpolar o que as tarefas de treino cobriram.</li>
         </ul>
